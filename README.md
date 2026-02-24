@@ -9,7 +9,7 @@ JavaScriptによるCRUD機能（作成・表示・更新・削除）を実装し
 ---
 
 ## ■ 公開URL
-https://（あなたのユーザー名）.github.io/kakeibo-app/
+https://yuito16515-beep.github.io/kakeibo-app/
 
 ---
 
