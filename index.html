@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家計簿アプリ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<h1>家計簿アプリ</h1>
+
+<div class="input-area">
+
+  <label for="type">種別：</label>
+  <select id="type">
+    <option value="expense">支出</option>
+    <option value="income">収入</option>
+  </select>
+
+  <label for="category">カテゴリ：</label>
+  <input id="category" type="text">
+
+  <label for="amount">金額：</label>
+  <input id="amount" type="number">
+
+  <label for="memo">メモ：</label>
+  <input id="memo" type="text">
+
+  <label for="date">日付：</label>
+  <input id="date" type="date">
+
+  <button id="add">追加</button>
+
+</div>
+
+<div class="summary">
+  <h2>集計</h2>
+  <p>収入合計: <span id="totalIncome">0</span> 円</p>
+  <p>支出合計: <span id="totalExpense">0</span> 円</p>
+  <p>収支: <span id="balance">0</span> 円</p>
+</div>
+
+<ul id="list"></ul>
+
+<script src="script.js"></script>
+</body>
+</html>
