@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kakeibo</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
+<meta name="theme-color" content="#6c5ce7">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+ --primary:#6c5ce7; --line:#e9ecf5; --sub:#636e72;
+ --income:#00b894; --expense:#d63031;
+}
+*{box-sizing:border-box}
+body{
+ margin:0;padding:20px;font-size:14px;
+ font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans";
+ background:#f7f8ff;
+}
+.container{max-width:680px;margin:auto}
+.card{
+ background:#fff;border-radius:16px;padding:16px;
+ margin-bottom:14px;border:1px solid var(--line);
+}
+label{font-size:12px;color:var(--sub);font-weight:700;margin-top:10px;display:block}
+input,select{
+ width:100%;padding:10px;border-radius:10px;
+ border:1px solid var(--line);margin-top:6px;font-size:14px;
+}
+button{
+ border:none;border-radius:12px;padding:10px;
+ background:var(--primary);color:#fff;font-weight:700;cursor:pointer
+}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.keypad button{background:#eef1ff;color:#333;font-size:18px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#f7f8ff;border-radius:12px;padding:10px;text-align:center}
+.stat b{font-size:18px;display:block;margin-top:4px}
+.record{
+ position:relative;background:#fff;border-radius:12px;
+ padding:12px;margin-bottom:8px;border:1px solid var(--line);
+}
+.record::before{
+ content:"";position:absolute;left:0;top:0;bottom:0;width:6px;
+ background:var(--expense);border-radius:12px 0 0 12px
+}
+.record[data-type="income"]::before{background:var(--income)}
+.small{font-size:11px;color:var(--sub)}
+.rank{margin-top:10px;font-size:12px}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="card">
+<label for="budget">今月の予算</label>
+<input id="budget" type="number" title="今月の予算">
+<button id="saveBudget" type="button">保存</button>
+<div id="remain" class="small"></div>
+</div>
+
+<div class="card">
+<label for="type">種別</label>
+<select id="type" title="種別">
+ <option value="expense">支出</option>
+ <option value="income">収入</option>
+</select>
+
+<label for="category">カテゴリ</label>
+<select id="category" title="カテゴリ"></select>
+
+<label for="amount">金額</label>
+<input id="amount" title="金額" inputmode="numeric">
+
+<div class="keypad" id="keypad"></div>
+
+<label for="memo">メモ</label>
+<input id="memo" title="メモ" placeholder="内容">
+
+<label for="date">日付</label>
+<input type="date" id="date" title="日付">
+
+<button id="addBtn" type="button">記録</button>
+</div>
+
+<div class="card">
+<div class="stats">
+ <div class="stat">今日<b id="todayTotal">0</b></div>
+ <div class="stat">今月<b id="monthTotal">0</b></div>
+</div>
+<canvas id="pie" height="200"></canvas>
+<div id="ranking" class="rank"></div>
+</div>
+
+<div class="card">
+<label for="search">検索</label>
+<input id="search" placeholder="検索" title="検索">
+<div id="list"></div>
+</div>
+
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+ navigator.serviceWorker.register('sw.js');
+}
+
+const el=id=>document.getElementById(id);
+let records=JSON.parse(localStorage.getItem('records'))||[];
+let budget=Number(localStorage.getItem('budget'))||0;
+let chart;
+
+const cats={
+ expense:["食費","日用品","交通費","娯楽","その他"],
+ income:["給料","その他"]
+};
+
+function updateCats(){
+ el('category').innerHTML=
+  cats[el('type').value].map(c=>`<option>${c}</option>`).join('')
+}
+el('type').onchange=updateCats;updateCats();
+
+// keypad
+[1,2,3,4,5,6,7,8,9,0,'00','←'].forEach(k=>{
+ const b=document.createElement('button');
+ b.textContent=k;
+ b.onclick=()=>k==='←'
+   ? el('amount').value=el('amount').value.slice(0,-1)
+   : el('amount').value+=k;
+ el('keypad').appendChild(b);
+});
+
+el('addBtn').onclick=()=>{
+ if(!el('amount').value)return;
+ records.push({
+  id:Date.now(),
+  type:el('type').value,
+  category:el('category').value,
+  amount:Number(el('amount').value),
+  memo:el('memo').value,
+  date:el('date').value
+ });
+ save(); clear(); render();
+};
+
+function save(){
+ localStorage.setItem('records',JSON.stringify(records));
+ localStorage.setItem('budget',budget);
+}
+function clear(){ el('amount').value=''; el('memo').value='' }
+
+function render(){
+ const today=new Date().toISOString().slice(0,10);
+ const month=today.slice(0,7);
+ let todaySum=0,monthSum=0,byCat={};
+ el('list').innerHTML='';
+
+ records.sort((a,b)=>b.date.localeCompare(a.date)).forEach(r=>{
+  const div=document.createElement('div');
+  div.className='record'; div.dataset.type=r.type;
+  div.innerHTML=`
+   <b>${r.category} ${r.type==='expense'?'-':'+'}${r.amount.toLocaleString()}円</b>
+   <div class='small'>${r.date} ${r.memo}</div>`;
+  el('list').appendChild(div);
+
+  const val=r.type==='expense'?r.amount:-r.amount;
+  if(r.date===today) todaySum+=val;
+  if(r.date.startsWith(month)) monthSum+=val;
+  if(r.type==='expense') byCat[r.category]=(byCat[r.category]||0)+r.amount;
+ });
+
+ el('todayTotal').textContent=todaySum.toLocaleString();
+ el('monthTotal').textContent=monthSum.toLocaleString();
+ drawChart(byCat);
+}
+
+function drawChart(data){
+ if(chart) chart.destroy();
+ chart=new Chart(el('pie'),{
+  type:'pie',
+  data:{labels:Object.keys(data),datasets:[{data:Object.values(data)}]},
+  options:{plugins:{legend:{position:'bottom'}}}
+ });
+}
+
+el('date').value=new Date().toISOString().slice(0,10);
+render();
+</script>
+</body>
+</html>
